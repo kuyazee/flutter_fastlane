@@ -1,23 +1,53 @@
-# This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tools
-#
-# For a list of all available actions, check out
-#
-#     https://docs.fastlane.tools/actions
-#
-# For a list of all available plugins, check out
-#
-#     https://docs.fastlane.tools/plugins/available-plugins
-#
-
-# Uncomment the line if you want fastlane to automatically update itself
-# update_fastlane
-
 default_platform(:ios)
 
 platform :ios do
-  desc "Description of what the lane does"
-  lane :custom_lane do
-    # add actions here: https://docs.fastlane.tools/actions
+  desc "Create a production ios build"
+	lane :build_production do
+	
+		# Since Fastlane is inside the `ios/fastlane` folder you have to go navigate to the root folder
+		Dir.chdir("../..") do
+			# This line creates the ios build
+			sh "flutter build ios --target \"lib/main_production.dart\" --flavor \"production\" --release"
+	
+			# Some of you might ask 'why not just use `build ipa` instead of `build ios`
+			# > Well, honestly this is just EASIER to setup
+		end
+	
+		# Go to the `ios` directory
+		Dir.chdir("../") do
+			# This installs your cocoapods dependencies 
+	    sh "pod install --repo-update"
+	  end
+	
+		# Build your ios app
+		build_ios_app(
+	    scheme: 'production',
+	    clean: true,
+	    output_directory: '../build/ios/',
+	    export_options: {
+	    method: "app-store", # ad-hoc or enterprise or app-store
+	      provisioningProfiles: {
+	        "com.your.bundle.id.here" => "the name of your "
+	      }
+	    }
+	  )
+	
+		# This line verifies that you created the file
+		if File.exist?(File.dirname(__FILE__) + "./../build/ios/Runner.ipa")
+			UI.message('Found ipa file')
+		else
+			UI.message('Unable to find ipa file')
+		end
+	end
+
+  desc "upload the created ios build to testflight"
+  lane :deploy_prod do
+    IPA_PATH = "./build/ios/Runner.ipa"
+    upload_to_testflight(
+      skip_submission: true,
+      skip_waiting_for_build_processing: true,
+      api_key_path: ENV['APPSTORE_JSON_PATH'] || "../store_certificates/appstore.json",
+      ipa: IPA_PATH,
+    )
   end
 end

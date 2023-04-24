@@ -1,38 +1,45 @@
-# This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tools
-#
-# For a list of all available actions, check out
-#
-#     https://docs.fastlane.tools/actions
-#
-# For a list of all available plugins, check out
-#
-#     https://docs.fastlane.tools/plugins/available-plugins
-#
-
-# Uncomment the line if you want fastlane to automatically update itself
-# update_fastlane
-
 default_platform(:android)
 
 platform :android do
-  desc "Runs all the tests"
-  lane :test do
-    gradle(task: "test")
+  desc "Create a production android build"
+  lane :build_production do
+
+    # Since Fastlane is inside the `android/fastlane` folder you have to go navigate to the root folder
+    Dir.chdir("../..") do
+      # This line creates the android build
+      sh "flutter build appbundle --target \"lib/main_production.dart\" --flavor \"production\" --release"
+    end
+
+    # This line verifies that you created the file
+    if File.exist?(File.dirname(__FILE__) + "./../build/app/outputs/bundle/productionRelease/app-production-release.aab")
+      UI.message('Found apk or aab file')
+    else
+      UI.message('Unable to find apk or aab')
+    end
   end
 
-  desc "Submit a new Beta Build to Crashlytics Beta"
-  lane :beta do
-    gradle(task: "clean assembleRelease")
-    crashlytics
-  
-    # sh "your_script.sh"
-    # You can also use other beta testing services here
-  end
+  desc "upload the created android build to Play Store"
+  lane :deploy_prod do
+    AAB_PATH = "./../build/app/outputs/bundle/productionRelease/app-production-release.aab"
+    
+    validate_play_store_json_key(
+      json_key: ENV['PLAYSTORE_JSON_PATH'] || "../store_certificates/playstore.json",
+    )
+    
+    upload_to_play_store(
+      track: "internal",
+      rollout: "1",
+      json_key: ENV['PLAYSTORE_JSON_PATH'] || "../store_certificates/playstore.json",
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      aab: AAB_PATH
+    )
 
-  desc "Deploy a new version to the Google Play"
-  lane :deploy do
-    gradle(task: "clean assembleRelease")
-    upload_to_play_store
+
+    firebase_app_distribution(
+      app: "1:1234567890:ios:0a1b2c3d4e5f67890"
+    )
   end
 end
